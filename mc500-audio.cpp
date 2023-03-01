@@ -6,8 +6,6 @@
 #include <avr/interrupt.h>
 #include <util/delay.h>
 #include "ShiftRegister.cpp"
-#include "debounce.h"
-#include "debounce.cpp"
 #include "twi-slave.h"
 #include "twi-slave.c"
 #include "Relay.cpp"
