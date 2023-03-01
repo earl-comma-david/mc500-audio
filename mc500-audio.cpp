@@ -12,28 +12,7 @@
 #include "twi-slave.c"
 #include "Relay.cpp"
 
-#define I2C_MESSAGE_LENGTH 3
-#define I2C_ADDR 0x10
-#define ATTENUATION_DATA_INDEX 0
-#define SWITCH_DATA_UPPER_INDEX 1
-#define SWITCH_DATA_LOWER_INDEX 2
-
-#define WORD_MASK_INPUT_1  0b1000000000000000
-#define WORD_MASK_INPUT_2  0b0100000000000000
-#define WORD_MASK_INPUT_3  0b0010000000000000
-#define WORD_MASK_OUTPUT_1 0b0000000001000000
-#define WORD_MASK_OUTPUT_2 0b0000000000100000
-#define WORD_MASK_OUTPUT_3 0b0000000000010000
-#define WORD_MASK_SUB      0b0000000000001000
-#define WORD_MASK_MONO     0b0000000000000100
-
-#define RELAY_OUT_PIN_INPUT_1  PD2
-#define RELAY_OUT_PIN_INPUT_2  PD3
-#define RELAY_OUT_PIN_INPUT_3  PD5
-#define RELAY_OUT_PIN_OUTPUT_1 PD6
-#define RELAY_OUT_PIN_OUTPUT_2 PD7
-#define RELAY_OUT_PIN_OUTPUT_3 PB0
-#define RELAY_OUT_PIN_MONO     PB1
+#include "config.h"
 
 volatile uint8_t _i2cIndex;
 // TODO: master reads its initial state from the slave
@@ -81,9 +60,7 @@ int main (void)
 {
     init();
 
-    uint8_t relayCount = 7;
-
-    Relay relays[relayCount] =
+    Relay relays[7] =
     {
         Relay(WORD_MASK_INPUT_1, &PORTD, RELAY_OUT_PIN_INPUT_1),
         Relay(WORD_MASK_INPUT_2, &PORTD, RELAY_OUT_PIN_INPUT_2),
@@ -112,12 +89,12 @@ int main (void)
 
         if (data != lastSwitchState)
         {
-            lastSwitchState = data;
-
-            for (int i = 0; i < relayCount; i++)
+            for (Relay relay : relays)
             {
-                relays[i].scan(data);
+                relay.Scan(data);
             }
+
+            lastSwitchState = data;
         }
     }
 
