@@ -20,7 +20,7 @@ all:
 	${OBJCOPY} -j .text -j .data -O ihex ${TARGET}.o ${TARGET}.hex
 
 flash:
-	avrdude -c arduino -p ${MCU} -P /dev/cu.usbserial-2 -b57600 -U flash:w:${TARGET}.hex:i
+	avrdude -c arduino -p ${MCU} -P /dev/cu.usbserial-1 -b57600 -U flash:w:${TARGET}.hex:i
 	#avrdude -p ${MCU} -c usbtiny -U flash:w:${TARGET}.hex:i -F
 
 clean:

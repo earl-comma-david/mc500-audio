@@ -12,13 +12,15 @@
 
 #include "config.h"
 
-volatile uint8_t _i2cIndex;
+volatile uint8_t _i2cIndex = 0;
+
 // TODO: master reads its initial state from the slave
-volatile uint8_t _data[I2C_MESSAGE_LENGTH] = { 127, 0b10000000, 0b01000000 };
+// message: { attenuationWord, inputSelectWord, outputSelectWord }
+volatile uint8_t _lastI2cMessage[I2C_MESSAGE_LENGTH] = { 127, 0b10000000, 0b01000000 };
 
 void I2C_received(uint8_t received_data)
 {
-    _data[_i2cIndex++] = received_data;
+    _lastI2cMessage[_i2cIndex++] = received_data;
     if (_i2cIndex == I2C_MESSAGE_LENGTH)
     {
         _i2cIndex = 0;
@@ -69,30 +71,32 @@ int main (void)
         Relay(WORD_MASK_MONO, &PORTB, RELAY_OUT_PIN_MONO)
     };
 
-    ShiftRegister mainAttenuationShiftRegister = ShiftRegister();
-    uint8_t lastAttenuationState = 0x00;
+    ShiftRegister attenuationShiftRegisterMain = ShiftRegister();
+    ShiftRegister attenuationShiftRegisterHP = ShiftRegister();
+    uint8_t lastAttenuationStateMain = 0x00;
+    uint8_t lastAttenuationStateHP = 0x00;
     uint16_t lastSwitchState = 0xff;
-    uint8_t byte = 0;
 
-    while(1)
+    while (1)
     {
-        if (_data[ATTENUATION_DATA_INDEX] != lastAttenuationState)
+        if (_lastI2cMessage[ATTENUATION_WORD_INDEX] != lastAttenuationStateMain)
         {
-            // TODO: reevaluate where the best place for this negation is:
-            lastAttenuationState = ~_data[ATTENUATION_DATA_INDEX];
-            mainAttenuationShiftRegister.put(lastAttenuationState);
+            lastAttenuationStateMain = _lastI2cMessage[ATTENUATION_WORD_INDEX];
+            attenuationShiftRegisterMain.put(127 - lastAttenuationStateMain);
         }
 
-        uint16_t data = (_data[SWITCH_DATA_UPPER_INDEX] << 8) | _data[SWITCH_DATA_LOWER_INDEX];
+        uint16_t ioSelectWord = 
+            (_lastI2cMessage[SWITCH_WORD_UPPER_INDEX] << 8)
+            | _lastI2cMessage[SWITCH_WORD_LOWER_INDEX];
 
-        if (data != lastSwitchState)
+        if (ioSelectWord != lastSwitchState)
         {
             for (Relay relay : relays)
             {
-                relay.Scan(data);
+                relay.Scan(ioSelectWord);
             }
 
-            lastSwitchState = data;
+            lastSwitchState = ioSelectWord;
         }
     }
 
