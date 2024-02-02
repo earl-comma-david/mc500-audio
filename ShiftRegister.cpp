@@ -1,19 +1,6 @@
 #include <avr/io.h>
 #include <util/delay.h>
 
-#define PIN_SER      PB2 // pin 14 on register
-#define PIN_RCLK     PB3 // pin 12 on register
-#define PIN_SRCLK    PB4 // pin 11 on register
-
-// NOTE: pin 10 (SRCLR') on register needs to go to VCC
-// NOTE: pin 13 (OE') on register needs to go to GND
-
-// write digital "high" to pin <pn> on portb
-#define GOHI(pn) PORTB |= (1<<pn)
-
-// write digital "low" to pin <pn> on portb
-#define GOLO(pn) PORTB &= ~(1<<pn)
-
 void put(uint8_t);
 void putBit(uint8_t);
 void latch();
@@ -25,39 +12,63 @@ uint8_t rotateRight(uint8_t);
 
 class ShiftRegister 
 {
+  private:
+    volatile uint8_t* _outputPortSer;
+    volatile uint8_t* _outputPortLatch;
+    volatile uint8_t* _outputPortClk;
+    uint8_t _pinSer;
+    uint8_t _pinLatch;
+    uint8_t _pinClk;
+
   public:
 
-    ShiftRegister() {}
-
-    void setup() {
-        // set output pins on portb (the only port on attiny85)
-        DDRB |= (1 << PIN_SER) | (1 << PIN_SRCLK) | (1 << PIN_RCLK);
+    ShiftRegister(volatile uint8_t* outputPort, uint8_t pinSer, uint8_t pinLatch, uint8_t pinClk)
+    {
+        _outputPortSer = outputPort;
+        _pinSer = pinSer;
+        _pinLatch = pinLatch;
+        _outputPortLatch = outputPort;
+        _pinClk = pinClk;
+        _outputPortClk = outputPort;
     }
 
-    //void longDelay(uint16_t ms) {
-    //    for(ms /= 10; ms>0; ms--) _delay_ms(10);
-    //}
+    ShiftRegister(
+        volatile uint8_t* outputPortSer,
+        uint8_t pinSer,
+        volatile uint8_t* outputPortLatch,
+        uint8_t pinLatch,
+        volatile uint8_t* outputPortClk,
+        uint8_t pinClk)
+    {
+        _outputPortSer = outputPortSer;
+        _pinSer = pinSer;
+        _outputPortLatch = outputPortLatch;
+        _pinLatch = pinLatch;
+        _outputPortClk = outputPortClk;
+        _pinClk = pinClk;
+    }
 
-    /*
-    * Shifts bits left, but wraps the left-most bit back around
-    */
     uint8_t rotateLeft(uint8_t toRotate) {
         uint8_t carry = (toRotate & 0b10000000) == 0b10000000;
         return (toRotate << 1 | carry);
     }
 
-    /*
-    * Shifts bits right, but wraps the right-most bit back around
-    */
     uint8_t rotateRight(uint8_t toRotate) {
         uint8_t carry = ( toRotate & 1 ) ? 0b10000000 : 0;
         return (toRotate >> 1 | carry);
     }
 
-    /*
-    * Writes a byte out serially to PIN_SER
-    */
-    void put(uint8_t toPut) {
+    void shiftOut(uint16_t toPut) {
+        uint8_t i;
+        for(i = 0; i < 16; i++) {
+            putBit(toPut & 1);
+            toPut >>= 1;
+        }
+
+        latch();
+    }
+
+    void shiftOut(uint8_t toPut) {
         uint8_t i;
         for(i = 0; i < 8; i++) {
             putBit(toPut & 1);
@@ -67,29 +78,25 @@ class ShiftRegister
         latch();
     }
 
-    /*
-    * Writes a bit out serially to PIN_SER
-    */
+
     void putBit(uint8_t bit) {
-        if(bit == 0) GOLO(PIN_SER);
-        else         GOHI(PIN_SER);
+        if(bit == 0)
+            *_outputPortSer &= ~(1<<_pinSer);
+        else
+            *_outputPortSer |= (1<<_pinSer);
 
         cycleClock();
     }
 
-    /*
-    * Tells the shift register to output all the bits it's read
-    */
     void latch() {
-        GOHI(PIN_RCLK);
-        GOLO(PIN_RCLK);
+        *_outputPortLatch |= (1<<_pinLatch);
+        *_outputPortLatch &= ~(1<<_pinLatch);
     }
 
-    /*
-    * Tells the shift register to read a bit
-    */
     void cycleClock() {
-        GOHI(PIN_SRCLK);
-        GOLO(PIN_SRCLK);
+        *_outputPortClk |= (1<<_pinClk);
+        _delay_us(5);
+        *_outputPortClk &= ~(1<<_pinClk);
+        _delay_us(5);
     }
 };
